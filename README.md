@@ -103,8 +103,8 @@ This percentile-based approach is:
 * **Dimensionless**: components become directly comparable regardless of their original units.
 * **Adaptive**: extremes are defined relative to recent history, which avoids fixing arbitrary thresholds.
 
-<img src="./img/all_scores.png" alt="Illustration" width="100%">
-<img src="./img/heatmap_corr.png" alt="Illustration" width="100%">
+<img src="./img/all_scores.png" alt="Illustration" width="75%">
+<img src="./img/heatmap_corr.png" alt="Illustration" width="75%">
 
 ### 3. Construction of the composite index
 
