@@ -103,8 +103,8 @@ This percentile-based approach is:
 * **Dimensionless**: components become directly comparable regardless of their original units.
 * **Adaptive**: extremes are defined relative to recent history, which avoids fixing arbitrary thresholds.
 
-<img src="./img/all_scores.png" alt="Illustration" width="50%">
-<img src="./img/heatmap_corr.png" alt="Illustration" width="50%">
+<img src="./img/all_scores.png" alt="Illustration" width="100%">
+<img src="./img/heatmap_corr.png" alt="Illustration" width="100%">
 
 ### 3. Construction of the composite index
 
@@ -114,7 +114,7 @@ The `compute_fear_greed` function aggregates component scores into a global inde
 
 * **Calibrated** version: linear combination of scores estimated by OLS regression on the CNN index:
 
-   <img src="./img/heatmap_corr.png" alt="Illustration" width="10%">
+   <img src="./img/eq.png" alt="Illustration" width="30%">
 
   where a and w are adjusted to minimise the squared error over the period where the CNN index is observed.
   The resulting weights put strong emphasis on the **safe-haven** component, **momentum**, **volatility** and the **high-yield spread**, which is economically coherent.
