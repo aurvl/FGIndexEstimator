@@ -224,3 +224,9 @@ Overall, the reconstructed index thus provides a **credible approximation of the
 * Some CNN components (number of new NYSE highs/lows, McClellan volume index, exact put/call) are not available as open data. They are therefore **approximated by proxies** (RSP vs SPX, HYG, FRED spreads, etc.).
 * The current approach is deliberately **linear and transparent**. Non-linear models (Random Forest, Gradient Boosting, neural networks) could capture more complex interactions, at the cost of reduced interpretability.
 * New sources (textual sentiment, sector ETF flows, order-flow) could enrich the index and improve detection of “intermediate” fear phases.
+
+### **Refs**
+
+> - [CNN Fear & Greed Index](https://edition.cnn.com/markets/fear-and-greed)
+> - [Yahoo Finance API (`yfinance`)](https://pypi.org/project/yfinance/)
+> - [FRED API](https://fred.stlouisfed.org/docs/api/fred/)
