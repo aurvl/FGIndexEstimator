@@ -229,6 +229,8 @@ Overall, the reconstructed index thus provides a **credible approximation of the
    
    And access the endpoint at `http://localhost:8000/v1/fgi`.
 
+   You can also call the API deployed on Render from Python using the `requests` library. See the example in [deploy/README.md](deploy/README.md#api-call).
+
 ---
 
 ## Limitations & possible extensions
