@@ -217,6 +217,18 @@ Overall, the reconstructed index thus provides a **credible approximation of the
 
    The notebook downloads the data (or reloads caches), computes the components, builds the naive index, then performs OLS calibration and evaluation.
 
+5. **Get estimations for a given period**
+
+   You can use the `get_fgi_estimation()` function from `get_fg.py` to get the estimated Fear & Greed score for a specific period.
+
+   You can also deploy the index as an API  (see `deploy/` folder) by running:
+
+   ```bash
+   uvicorn deploy.api:app --reload
+   ```
+   
+   And access the endpoint at `http://localhost:8000/v1/fgi`.
+
 ---
 
 ## Limitations & possible extensions

@@ -1,3 +1,7 @@
+# --- FastAPI backend dependencies ---
+fastapi
+uvicorn[standard]
+python-dotenv
 numpy
 pandas
 yfinance
@@ -5,3 +9,4 @@ seaborn
 matplotlib
 scikit-learn
 requests
+dotenv
