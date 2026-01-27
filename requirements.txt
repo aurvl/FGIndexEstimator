@@ -1,12 +1,11 @@
 # --- FastAPI backend dependencies ---
-fastapi
-uvicorn[standard]
-python-dotenv
-numpy
-pandas
-yfinance
-seaborn
-matplotlib
-scikit-learn
-requests
-dotenv
+fastapi==0.115.11
+uvicorn[standard]==0.34.0
+numpy==2.4.1
+pandas==3.0.0
+yfinance==0.2.61
+seaborn==0.13.2
+matplotlib==3.10.1
+scikit-learn==1.6.1
+requests==2.32.3
+python-dotenv==1.0.0
