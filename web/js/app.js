@@ -1,3 +1,5 @@
+console.log("[BOOT] app.js loaded", window.location.href);
+
 import { fetchChart } from "./api.js";
 import { createChart, renderChart, THEMES } from "./chart.js";
 import { setActiveTab, setActiveRange, applyTheme, initMarketDropdown, getSelectedMarkets, toggleDebugPanel, showDebugPayload } from "./ui.js";

@@ -1,3 +1,5 @@
+console.log("[BOOT] api.js loaded");
+
 const API_BASE = ""; // use same-origin by default
 
 export async function fetchChart({ range, include, with_components, use_calibrated_model }) {
