@@ -192,7 +192,7 @@ def build_raw_indicators(
     # 3) Safe forward-fill
     if existing:
         df = df.copy()
-        df[existing] = df[existing].ffill()ffill()
+        df[existing] = df[existing].ffill()
 
     return df
 
