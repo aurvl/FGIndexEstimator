@@ -158,12 +158,15 @@ def build_raw_indicators(
 
     # Assemblage des prix marché
     df = pd.concat([spx, vix, tlt, rsp, hyg], axis=1)
+    
     df.index = pd.to_datetime(df.index)
     df = df.sort_index().asfreq("B")   # calendrier business
     df = df.dropna(how="all")
 
     market_cols = ["^GSPC", "^VIX", "TLT", "RSP", "HYG"]
     existing = [c for c in market_cols if c in df.columns]
+    existing = pd.Index(existing).unique().tolist()
+    
     if existing:
         df[existing] = df[existing].ffill()
 
@@ -187,7 +190,9 @@ def build_raw_indicators(
     existing = list(dict.fromkeys([c for c in market_cols if c in df.columns]))
 
     # 3) Safe forward-fill
-    df.loc[:, existing] = df.loc[:, existing].ffill()
+    if existing:
+        df = df.copy()
+        df[existing] = df[existing].ffill()ffill()
 
     return df
 
