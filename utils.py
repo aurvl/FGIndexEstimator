@@ -277,69 +277,93 @@ def build_raw_indicators(
 # -----------------------------------
 def compute_components(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calcule les composantes brutes de l'indice Fear & Greed.
+    Calcule les composantes brutes du Fear & Greed.
 
-    Colonnes attendues dans df :
-      - '^GSPC' : prix S&P 500
-      - '^VIX'  : VIX
-      - 'TLT'   : Treasuries long terme
-      - 'RSP'   : ETF equal-weight S&P 500 (breadth proxy)
-      - 'HYG'   : ETF high yield (junk bond proxy)
-      - 'HY_spread' : spread high-yield (FRED)
-      - 'put_call'  : ratio put/call (si dispo)
+    Colonnes acceptées (alias) :
+      - SPX : 'spx' ou '^GSPC'
+      - VIX : 'vix' ou '^VIX'
+      - TLT : 'tlt' ou 'TLT'
+      - RSP : 'rsp' ou 'RSP'
+      - HYG : 'hyg' ou 'HYG'
+      - FRED : 'HY_spread' (optionnel), 'put_call' (optionnel)
 
-    Retourne un DataFrame 'out' avec :
-      - momentum_spx         : (P - MA125) / MA125
-      - strength_proxy       : (P - MA200) / MA200
-      - breadth_rsp_spx      : surperformance 60 j RSP - SPX
-      - junk_bond_mom_20d    : rendement 20 j de HYG
-      - hy_spread            : spread HY brut (pour un indicateur de peur)
+    Retourne un DataFrame indexé comme df, avec :
+      - momentum_spx         : (SPX - MA125) / MA125
+      - strength_proxy       : (SPX - MA200) / MA200
+      - breadth_rsp_spx      : ret60(RSP) - ret60(SPX)
+      - junk_bond_mom_20d    : ret20(HYG)
+      - hy_spread            : spread HY brut (à inverser au scoring)
       - vix_rel              : (VIX - MA50) / MA50
-      - safe_haven_20d       : perf_20j SPX - perf_20j TLT
-      - put_call             : ratio brut si dispo
+      - safe_haven_20d       : ret20(SPX) - ret20(TLT)
+      - put_call             : put/call brut (si dispo)
     """
+
+    # --- resolve aliases ---
+    aliases = {
+        "spx": ["spx", "^GSPC"],
+        "vix": ["vix", "^VIX"],
+        "tlt": ["tlt", "TLT"],
+        "rsp": ["rsp", "RSP"],
+        "hyg": ["hyg", "HYG"],
+    }
+
+    def _pick_col(candidates: list[str]) -> str | None:
+        for c in candidates:
+            if c in df.columns:
+                return c
+        return None
+
+    col_spx = _pick_col(aliases["spx"])
+    col_vix = _pick_col(aliases["vix"])
+    col_tlt = _pick_col(aliases["tlt"])
+    col_rsp = _pick_col(aliases["rsp"])
+    col_hyg = _pick_col(aliases["hyg"])
+
+    missing = [name for name, col in {
+        "spx": col_spx, "vix": col_vix, "tlt": col_tlt, "rsp": col_rsp, "hyg": col_hyg
+    }.items() if col is None]
+
+    if missing:
+        raise KeyError(f"Missing required market series: {missing}. Available: {list(df.columns)}")
+
+    # --- typed series (float), aligned on df.index ---
+    spx = pd.to_numeric(df[col_spx], errors="coerce").astype(float)
+    vix = pd.to_numeric(df[col_vix], errors="coerce").astype(float)
+    tlt = pd.to_numeric(df[col_tlt], errors="coerce").astype(float)
+    rsp = pd.to_numeric(df[col_rsp], errors="coerce").astype(float)
+    hyg = pd.to_numeric(df[col_hyg], errors="coerce").astype(float)
 
     out = pd.DataFrame(index=df.index)
 
-    # 1) Momentum SPX (inchangé)
-    ma125 = df["^GSPC"].rolling(125, min_periods=60).mean()
-    out["momentum_spx"] = (df["^GSPC"] - ma125) / ma125
+    # 1) Momentum SPX (MA125)
+    ma125 = spx.rolling(125, min_periods=60).mean()
+    out["momentum_spx"] = (spx - ma125) / ma125
 
-    # 2) Strength proxy (toujours MA200 : très corrélé au momentum, mais on le garde)
-    ma200 = df["^GSPC"].rolling(200, min_periods=80).mean()
-    out["strength_proxy"] = (df["^GSPC"] - ma200) / ma200
+    # 2) Strength proxy (MA200)
+    ma200 = spx.rolling(200, min_periods=80).mean()
+    out["strength_proxy"] = (spx - ma200) / ma200
 
-    # 3) Breadth : sur-performance 60 j de RSP vs SPX (plus stationnaire qu'un simple ratio de niveaux)
-    if "RSP" in df.columns:
-        ret_rsp_60 = df["RSP"].pct_change(60)
-        ret_spx_60 = df["^GSPC"].pct_change(60)
-        out["breadth_rsp_spx"] = ret_rsp_60 - ret_spx_60
-    else:
-        out["breadth_rsp_spx"] = np.nan
+    # 3) Breadth : surperformance 60j RSP vs SPX
+    out["breadth_rsp_spx"] = rsp.pct_change(60) - spx.pct_change(60)
 
-    # 4) Junk bond momentum : rendement 20 j de HYG
-    if "HYG" in df.columns:
-        out["junk_bond_mom_20d"] = df["HYG"].pct_change(20)
-    else:
-        out["junk_bond_mom_20d"] = np.nan
+    # 4) Junk bond momentum : rendement 20j HYG
+    out["junk_bond_mom_20d"] = hyg.pct_change(20)
 
-    # 5) High-yield spread brut (plus grand = plus de peur, on inversera au scoring)
-    out["hy_spread"] = df.get("HY_spread")
+    # 5) High-yield spread brut (optionnel)
+    out["hy_spread"] = pd.to_numeric(df["HY_spread"], errors="coerce") if "HY_spread" in df.columns else np.nan
 
-    # 6) Volatilité relative : (VIX - MA50) / MA50
-    vix = df["^VIX"].astype(float)
+    # 6) VIX relatif : (VIX - MA50) / MA50
     ma_vix_50 = vix.rolling(50, min_periods=20).mean()
     out["vix_rel"] = (vix - ma_vix_50) / ma_vix_50
 
-    # 7) Safe haven demand : différence de performance 20 j actions - Treasuries
-    spx_ret_20 = df["^GSPC"].pct_change(20)
-    tlt_ret_20 = df["TLT"].pct_change(20)
-    out["safe_haven_20d"] = spx_ret_20 - tlt_ret_20
+    # 7) Safe haven demand : ret20(SPX) - ret20(TLT)
+    out["safe_haven_20d"] = spx.pct_change(20) - tlt.pct_change(20)
 
-    # 8) Put/Call brut (si présent)
-    out["put_call"] = df.get("put_call")
+    # 8) Put/Call brut (optionnel)
+    out["put_call"] = pd.to_numeric(df["put_call"], errors="coerce") if "put_call" in df.columns else np.nan
 
     return out
+
 
 # ---------------------------------------------
 # 5. Specs composantes & Fear/Greed calculation
