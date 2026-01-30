@@ -4,6 +4,11 @@ import requests
 import pandas as pd
 import numpy as np
 import yfinance as yf
+import logging
+from threading import Lock
+
+logger = logging.getLogger(__name__)
+_YF_LOCK = Lock()
 
 # -----------------------------------
 # 1. fonction FRED
@@ -108,13 +113,27 @@ def percentile_score(
 # -----------------------------------
 # 3. Récupération des données marché
 # -----------------------------------
-def get_yf_close(ticker, start="1990-01-01"):
-    data = yf.download(ticker, start=start, progress=False, auto_adjust=False)
-    if data is None or len(data) == 0:
-        raise ValueError(f"No data returned by yfinance for {ticker}")
-    close = data["Close"].copy()
-    close.name = ticker
-    return close
+def get_yf_close(ticker: str, start: str = "1990-01-01") -> pd.Series:
+    with _YF_LOCK:
+        data = yf.download(
+            ticker,
+            start=start,
+            progress=False,
+            auto_adjust=False,
+            threads=False,   # CRUCIAL
+        )
+
+    if data is None or data.empty:
+        return pd.Series(dtype=float)
+
+    # yfinance renvoie souvent colonnes: Open High Low Close Adj Close Volume
+    if "Adj Close" in data.columns:
+        s = data["Adj Close"].copy()
+    else:
+        s = data["Close"].copy()
+
+    s.name = ticker
+    return s
 
 def build_raw_indicators(
     api_key_fred: str,
@@ -123,21 +142,85 @@ def build_raw_indicators(
 ) -> pd.DataFrame:
     """
     Récupère et assemble les séries brutes nécessaires à l'indice :
-      - '^GSPC', '^VIX', 'TLT', 'RSP', 'HYG' via yfinance
-      - 'HY_spread' via FRED (BAMLH0A0HYM2)
-      - 'put_call' via FRED si disponible (PUTCALL)
+      - SPX, VIX, TLT, RSP, HYG via yfinance (closes)
+      - HY_spread via FRED (BAMLH0A0HYM2)
+      - put_call via FRED (PUTCALL, si dispo)
 
-    Renvoie un DataFrame journalier business days, ffill sur les jours sans cotation.
+    Retour:
+      DataFrame sur calendrier business (B), index trié, colonnes stables :
+        ['spx', 'vix', 'tlt', 'rsp', 'hyg', 'HY_spread', 'put_call'] (selon dispo)
     """
 
     os.makedirs(data_dir, exist_ok=True)
 
-    spx = get_yf_close("^GSPC", start=start)
-    vix = get_yf_close("^VIX", start=start)
-    tlt = get_yf_close("TLT", start=start)
-    rsp = get_yf_close("RSP", start=start)
-    hyg = get_yf_close("HYG", start=start)
+    # --- 1) mapping ticker -> nom de colonne stable ---
+    market_map = {
+        "^GSPC": "spx",
+        "^VIX":  "vix",
+        "TLT":   "tlt",
+        "RSP":   "rsp",
+        "HYG":   "hyg",
+    }
 
+    # --- 2) télécharger chaque série séparément et la renommer ---
+    market_series = []
+    for ticker, colname in market_map.items():
+        s = get_yf_close(ticker, start=start)
+
+        if s is None or len(s) == 0:
+            logger.warning("yfinance returned empty series for %s", ticker)
+            continue
+
+        # s peut être Series ou DataFrame selon ta fonction -> on force Series
+        if isinstance(s, pd.DataFrame):
+            # si c'est un DF, on prend la 1ere colonne
+            if s.shape[1] == 0:
+                logger.warning("Empty DataFrame for %s", ticker)
+                continue
+            s = s.iloc[:, 0]
+
+        s = pd.Series(s, name=colname)
+
+        # normaliser l'index : datetime, tz-naive, trié, doublons gérés
+        idx = pd.to_datetime(s.index, errors="coerce")
+        s.index = idx
+        s = s[~s.index.isna()]
+        s = s.sort_index()
+
+        # si index tz-aware -> tz-naive
+        if getattr(s.index, "tz", None) is not None:
+            s.index = s.index.tz_convert(None)
+
+        # si doublons de dates -> on garde le dernier
+        if s.index.duplicated().any():
+            s = s[~s.index.duplicated(keep="last")]
+
+        # force float
+        s = pd.to_numeric(s, errors="coerce").astype(float)
+
+        market_series.append(s)
+
+    # --- 3) concat marché avec colonnes uniques garanties ---
+    if not market_series:
+        raise RuntimeError("No market series could be loaded from yfinance.")
+
+    df = pd.concat(market_series, axis=1)
+
+    # sécurité extra : aucune colonne dupliquée
+    if df.columns.duplicated().any():
+        dupes = df.columns[df.columns.duplicated()].tolist()
+        logger.warning("Duplicate market columns detected (dropping): %s", dupes)
+        df = df.loc[:, ~df.columns.duplicated(keep="first")]
+
+    # --- 4) calendrier business + ffill global ---
+    df.index = pd.to_datetime(df.index, errors="coerce")
+    df = df[~df.index.isna()].sort_index()
+
+    # calendrier business, puis ffill (évite les trous de cotation)
+    df = df.asfreq("B")
+    df = df.ffill()
+
+    # --- 5) FRED (join safe) ---
     # HY spread (BofA High Yield Option-Adjusted Spread)
     hy_path = os.path.join(data_dir, "BAMLH0A0HYM2.json")
     hy_spread = _get_data_fred(
@@ -147,7 +230,18 @@ def build_raw_indicators(
         rename="HY_spread",
     )
 
-    # Put/Call ratio (si dispo sur FRED avec ton API)
+    if hy_spread is not None and len(hy_spread) > 0:
+        hy_spread.index = pd.to_datetime(hy_spread.index, errors="coerce")
+        hy_spread = hy_spread[~hy_spread.index.isna()].sort_index()
+        if getattr(hy_spread.index, "tz", None) is not None:
+            hy_spread.index = hy_spread.index.tz_convert(None)
+        hy_spread = hy_spread[~hy_spread.index.duplicated(keep="last")]
+
+        # align sur df (B) + fill
+        hy_spread = hy_spread.reindex(df.index).ffill()
+        df = df.join(hy_spread, how="left")
+
+    # Put/Call ratio (si dispo FRED)
     pc_path = os.path.join(data_dir, "PUTCALL.json")
     put_call = _get_data_fred(
         pc_path,
@@ -156,43 +250,25 @@ def build_raw_indicators(
         rename="put_call",
     )
 
-    # Assemblage des prix marché
-    df = pd.concat([spx, vix, tlt, rsp, hyg], axis=1)
-    
-    df.index = pd.to_datetime(df.index)
-    df = df.sort_index().asfreq("B")   # calendrier business
-    df = df.dropna(how="all")
+    if put_call is not None and len(put_call) > 0:
+        put_call.index = pd.to_datetime(put_call.index, errors="coerce")
+        put_call = put_call[~put_call.index.isna()].sort_index()
+        if getattr(put_call.index, "tz", None) is not None:
+            put_call.index = put_call.index.tz_convert(None)
+        put_call = put_call[~put_call.index.duplicated(keep="last")]
 
-    market_cols = ["^GSPC", "^VIX", "TLT", "RSP", "HYG"]
-    existing = [c for c in market_cols if c in df.columns]
-    existing = pd.Index(existing).unique().tolist()
-    
-    if existing:
-        df[existing] = df[existing].ffill()
+        put_call = put_call.reindex(df.index).ffill()
+        df = df.join(put_call, how="left")
 
-    # Join HY spread et put/call
-    df = df.join(hy_spread, how="left")
-    df = df.join(put_call, how="left")
-
-    if "HY_spread" in df.columns:
-        df["HY_spread"] = df["HY_spread"].ffill()
-
-    if "put_call" in df.columns:
-        df["put_call"] = df["put_call"].ffill()
-
-    if df.columns.has_duplicates:
+    # --- 6) dernière passe de nettoyage ---
+    # float + aucun doublon
+    if df.columns.duplicated().any():
         dupes = df.columns[df.columns.duplicated()].tolist()
-        print("[WARN] Duplicate columns in build_raw_indicators:", dupes)
-        print("[WARN] Columns:", list(df.columns))
-        df = df.loc[:, ~df.columns.duplicated()].copy()
+        logger.warning("Duplicate columns detected (dropping): %s", dupes)
+        df = df.loc[:, ~df.columns.duplicated(keep="first")]
 
-    # 2) Ensure 'existing' has unique keys too (defensive)
-    existing = list(dict.fromkeys([c for c in market_cols if c in df.columns]))
-
-    # 3) Safe forward-fill
-    if existing:
-        df = df.copy()
-        df[existing] = df[existing].ffill()
+    # enlever lignes entièrement vides (rare après ffill)
+    df = df.dropna(how="all")
 
     return df
 
