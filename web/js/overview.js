@@ -1,4 +1,8 @@
 /* overview.js */
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("[overview] loaded");
+  initOverview();
+});
 
 const CACHE_KEY = "FG_CHART_MAX_V1";
 const API_URL =
