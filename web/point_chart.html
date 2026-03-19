@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estimated Fear & Greed Index Dashboard</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script>
+        // Apply theme from localStorage, else from system preference (shared across pages)
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (t !== 'dark' && t !== 'light') {
+                    t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                    localStorage.setItem('theme', t);
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { }
+        })();
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            color: #333;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .main-box-content {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            width: 70%;
+            height: 65vh;
+        }
+
+        .title {
+            border-bottom: 1px solid #ccc;
+            padding: 1%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(248, 249, 250, 0.5);
+            border-top-left-radius: 11px;
+            border-top-right-radius: 11px;
+        }
+
+        .navig {
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .navig > div {
+            display: flex;
+            align-items: center;
+            /* border: 1px solid #ccc; */
+            gap: 6px;
+        }
+
+        .navig a {
+            display: flex;
+            text-decoration: none;
+            width: 20px;
+            height: 20px;
+            font-size: 11px;
+            color: #929292cc;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            border-radius: 50%;
+            background-color: #333;
+            transition: background-color 0.3s ease;
+        }
+
+        .navig a:hover {
+            color: #007BFF;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+        }
+
+        .navig a.active {
+            color: #ccc;
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+
+        .toogle-theme {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ccc;
+            background-color: #f8f9fa;
+            border-radius: 7px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .toogle-theme:hover {
+            background-color: #e9ecef;
+        }
+
+        .toogle-theme {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .toogle-theme svg  {
+            width: 20px;
+            height: 20px;
+            stroke: #333;
+        }
+
+        .toogle-theme:hover svg {
+            stroke: #ffc300;
+        }
+        
+        .point-chart-box {
+            margin: 0 1%;
+            height: 78%;
+            display: block;
+        }
+
+        .point-chart-params {
+            height: 10%;
+            width: 100%;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .time-range {
+            width: 30%;
+            display: flex;
+            gap: 3%;
+        }
+
+        .time-range button {
+            border: none;
+            font-weight: 500;
+            background: none;
+            cursor: pointer;
+            padding: 1%;
+            border-radius: 5px;
+        }
+
+        .time-range button:hover {
+            color: #007BFF;
+            background-color: #f0f0f0;
+        }
+
+        #market-indexes-selector {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            background-color: #f0f0f0;
+            cursor: pointer;
+        }
+
+        #market-indexes-selector:hover {
+            background-color: #e0e0e0;
+        }
+
+        .point-chart-plot {
+            height: 88%;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        footer {
+            border-top: 1px solid #ccc;
+            padding: 1%;
+            font-size: 13px;   
+        }
+
+        footer a {
+            text-decoration: none;
+            color: #333;
+        }
+
+        footer a:hover {
+            color: #007BFF;
+        }
+
+        @media (max-width: 768px) {
+            .main-box-content {
+                width: 100%;
+                height: auto;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="./newjs/theme.css">
+    <script src="./newjs/theme.js" defer></script>
+    <script src="./newjs/api_store.js" defer></script>
+</head>
+<body>
+    <section class="main-box-content">
+        <div class="title">
+            <h3>Estimated Fear & Greed Index Analysis</h3>
+            <div class="navig">
+                <div>
+                    <a href="gauge_chart.html">◄</a>
+                    <a href="#", class="active">►</a>
+                </div>
+                <div class="toogle-theme">
+                    <i data-lucide="sun"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="point-chart-box">
+            <div class="point-chart-params">
+                <div class="time-range">
+                    <p>Range:</p>
+                    <button class="seg seg--active" data-range="1M">1M</button>
+                    <button class="seg" data-range="3M">3M</button>
+                    <button class="seg" data-range="6M">6M</button>
+                    <button class="seg" data-range="1Y">1Y</button>
+                    <button class="seg" data-range="5Y">5Y</button>
+                    <button class="seg" data-range="MAX">MAX</button>
+                </div>
+                <select id="market-indexes-selector">
+                    <option value="index1">None</option>
+                    <option value="index1">Index 1</option>
+                    <option value="index2">Index 2</option>
+                    <option value="index3">Index 3</option>
+                </select>
+            </div>
+
+            <div class="point-chart-plot" id="point-chart-plot"></div>
+        </div>
+
+        <footer>
+            <p>&copy; Sources: Yahoo Finance, FRED • 2026 Estimated Fear & Greed Index. All rights reserved.</p>
+            <p>Author: <a href="https://aurvl.github.io/portfolio/index.html">Aurel VEHI</a></p>
+        </footer>
+    </section>
+</body>
+<script>
+    lucide.createIcons();
+</script>
+
+<script>
+    /**
+     * point_chart.html
+     *
+     * Scatter plot requirement:
+     * - X axis: FGI (0..100)
+     * - Y axis: selected market index (raw close)
+     *
+     * Data is reused from the ONE-SHOT cached `/v1/chart?range=MAX` response.
+     * No extra API calls when switching pages.
+     */
+
+    window.addEventListener('DOMContentLoaded', function () {
+        (async function () {
+            var chartDom = document.getElementById('point-chart-plot');
+            if (!chartDom || typeof echarts === 'undefined' || !window.DashboardStore) return;
+
+            var myChart = echarts.init(chartDom);
+
+            var MARKET_LABELS = {
+                sp500: 'S&P 500',
+                nasdaq: 'NASDAQ Composite',
+                cac40: 'CAC 40',
+                msciworld: 'MSCI World'
+            };
+
+            var rangeButtons = Array.prototype.slice.call(document.querySelectorAll('.time-range button[data-range]'));
+            var marketSelect = document.getElementById('market-indexes-selector');
+
+            function setActiveRange(range) {
+                rangeButtons.forEach(function (btn) {
+                    var isActive = btn.getAttribute('data-range') === range;
+                    btn.classList.toggle('seg--active', isActive);
+                });
+            }
+
+            function populateMarketSelect() {
+                if (!marketSelect) return;
+                marketSelect.innerHTML = '';
+                var optNone = document.createElement('option');
+                optNone.value = 'none';
+                optNone.textContent = 'None';
+                marketSelect.appendChild(optNone);
+                Object.keys(MARKET_LABELS).forEach(function (id) {
+                    var opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = MARKET_LABELS[id];
+                    marketSelect.appendChild(opt);
+                });
+            }
+
+            function getThemeColors() {
+                var isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+                return {
+                    text: isDark ? 'rgba(255,255,255,0.75)' : '#464646',
+                    gridLine: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'
+                };
+            }
+
+            function buildScatterData(fgiPoints, marketPoints) {
+                // Align by date: keep only dates that exist in BOTH series.
+                var marketMap = Object.create(null);
+                (marketPoints || []).forEach(function (p) {
+                    if (!p || !p.date) return;
+                    if (typeof p.value !== 'number' || !isFinite(p.value)) return;
+                    marketMap[p.date] = p.value;
+                });
+
+                var out = [];
+                (fgiPoints || []).forEach(function (p) {
+                    if (!p || !p.date) return;
+                    if (typeof p.value !== 'number' || !isFinite(p.value)) return;
+                    var mv = marketMap[p.date];
+                    if (typeof mv !== 'number' || !isFinite(mv)) return;
+                    // Clamp FGI to [0,100] to avoid negative values (requested)
+                    var fgi = Math.max(0, Math.min(100, p.value));
+                    out.push({
+                        value: [fgi, mv],
+                        date: p.date
+                    });
+                });
+                return out;
+            }
+
+            function render(chartPayload, state) {
+                var colors = getThemeColors();
+                var datasets = (chartPayload && chartPayload.datasets) ? chartPayload.datasets : {};
+                var fgiAll = datasets.fgi || [];
+                var marketAll = (state.marketId && datasets[state.marketId]) ? datasets[state.marketId] : [];
+
+                var fgiSlice = window.DashboardStore.slicePointsByRange(fgiAll, state.range);
+                var marketSlice = window.DashboardStore.slicePointsByRange(marketAll, state.range);
+
+                var data = buildScatterData(fgiSlice, marketSlice);
+
+                var hasMarket = state.marketId && state.marketId !== 'none';
+                var yName = hasMarket ? (MARKET_LABELS[state.marketId] || state.marketId) : 'Index';
+
+                var option = {
+                    backgroundColor: 'transparent',
+                    grid: {
+                        left: 44,
+                        right: 18,
+                        top: 16,
+                        bottom: 28,
+                        containLabel: true
+                    },
+                    // Color points by sentiment (based on X = FGI)
+                    visualMap: {
+                        show: false,
+                        type: 'piecewise',
+                        dimension: 0,
+                        pieces: [
+                            { lt: 20, color: '#d73027' },
+                            { gte: 20, lt: 40, color: '#fc8d59' },
+                            { gte: 40, lt: 60, color: '#fee08b' },
+                            { gte: 60, lt: 80, color: '#91cf60' },
+                            { gte: 80, color: '#1a9850' }
+                        ]
+                    },
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: function (params) {
+                            var d = (params && params.data) ? params.data : null;
+                            var v = (d && d.value) ? d.value : null;
+                            if (!v || v.length < 2) return '';
+                            return (
+                                (d.date || '') +
+                                '<br/>FGI: ' + Number(v[0]).toFixed(1) +
+                                '<br/>' + yName + ': ' + v[1]
+                            );
+                        }
+                    },
+                    xAxis: {
+                        type: 'value',
+                        name: 'FGI',
+                        min: 0,
+                        max: 100,
+                        nameLocation: 'middle',
+                        nameGap: 18,
+                        nameTextStyle: { color: colors.text },
+                        axisLabel: { color: colors.text, margin: 4 },
+                        splitLine: { lineStyle: { color: colors.gridLine } }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: yName,
+                        nameLocation: 'middle',
+                        nameGap: 28,
+                        nameRotate: 90,
+                        nameTextStyle: { color: colors.text },
+                        axisLabel: {
+                            color: colors.text,
+                            margin: 4,
+                            formatter: function (val) {
+                                var v = Number(val);
+                                if (!isFinite(v)) return '';
+                                var abs = Math.abs(v);
+                                if (abs >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+                                if (abs >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+                                // keep small values as-is
+                                return String(Math.round(v * 10) / 10);
+                            }
+                        },
+                        splitLine: { lineStyle: { color: colors.gridLine } }
+                    },
+                    series: [
+                        {
+                            name: 'FGI vs ' + yName,
+                            type: 'scatter',
+                            data: hasMarket ? data : [],
+                            symbolSize: 6,
+                            // Color is controlled by visualMap
+                        }
+                    ]
+                };
+
+                myChart.setOption(option, true);
+            }
+
+            // Ensure cached data exists (fetch once, then reuse)
+            var chartPayload = await window.DashboardStore.ensureData({ include: window.DashboardStore.DEFAULT_INCLUDE });
+
+            populateMarketSelect();
+            var state = window.DashboardStore.getState();
+            setActiveRange(state.range);
+            if (marketSelect) marketSelect.value = state.marketId;
+
+            render(chartPayload, state);
+
+            // Theme toggle: re-render to update text/grid colors
+            window.addEventListener('dashboard:themechange', function () {
+                render(chartPayload, state);
+            });
+
+            rangeButtons.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var nextRange = btn.getAttribute('data-range');
+                    state = window.DashboardStore.setState({ range: nextRange });
+                    setActiveRange(state.range);
+                    render(chartPayload, state);
+                });
+            });
+
+            if (marketSelect) {
+                marketSelect.addEventListener('change', function () {
+                    state = window.DashboardStore.setState({ marketId: marketSelect.value });
+                    render(chartPayload, state);
+                });
+            }
+
+            window.addEventListener('resize', function () {
+                myChart.resize();
+            });
+        })();
+    });
+</script>
+</html>

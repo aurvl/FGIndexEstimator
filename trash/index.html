@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fear & Greed Dashboard</title>
   <link rel="stylesheet" href="./assets/styles.css" />
+  <link rel="stylesheet" href="./newjs/theme.css" />
   <!-- ECharts CDN -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <script>
@@ -12,7 +13,11 @@
     (function() {
       try {
         var t = localStorage.getItem('theme');
-        if (t) document.documentElement.setAttribute('data-theme', t);
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+          localStorage.setItem('theme', t);
+        }
+        document.documentElement.setAttribute('data-theme', t);
       } catch(e) {}
     })();
   </script>

@@ -5,6 +5,7 @@ from fastapi.responses import RedirectResponse
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import datetime
+import math
 import pandas as pd
 from deploy.schemas import (
     FGIResponse, FGISeriesPoint, FGIResponseMeta,
@@ -12,6 +13,42 @@ from deploy.schemas import (
 )
 from deploy.services.fgi_service import get_fgi_series
 from deploy.services.market_service import MARKET_REGISTRY, get_market_series
+
+
+def _safe_float(val):
+    if val is None or pd.isna(val):
+        return None
+    try:
+        f = float(val)
+    except Exception:
+        return None
+    return f if math.isfinite(f) else None
+
+
+def _series_to_points(series, date_trunc_10: bool = True):
+    points = []
+    for idx, val in series.items():
+        f = _safe_float(val)
+        if f is None:
+            continue
+        d = str(idx)
+        if date_trunc_10:
+            d = d[:10]
+        points.append(FGISeriesPoint(date=d, value=f))
+    return points
+
+
+def _last_finite_value(series) -> float | None:
+    # Iterate from the end to find last JSON-safe value
+    try:
+        values = list(series.values)
+    except Exception:
+        values = []
+    for v in reversed(values):
+        f = _safe_float(v)
+        if f is not None:
+            return f
+    return None
 
 
 load_dotenv()
@@ -92,7 +129,7 @@ def get_market(
         series, start_date, end_date = get_market_series(market_id, range, end_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    points = [FGISeriesPoint(date=str(idx), value=float(val)) for idx, val in series.items()]
+    points = _series_to_points(series, date_trunc_10=True)
     
     duration = (datetime.utcnow() - start_time).total_seconds()
     meta = MarketSeriesMeta(
@@ -202,7 +239,7 @@ def get_chart(
                     break
             if not col:
                 raise HTTPException(status_code=500, detail="FG_estimation or FG_like column not found in result.")
-            points = [FGISeriesPoint(date=str(idx)[:10], value=float(val)) for idx, val in df[col].items()]
+            points = _series_to_points(df[col], date_trunc_10=True)
             datasets["fgi"] = points
             if start_date is None:
                 start_date, end_date_actual = s, e
@@ -211,13 +248,13 @@ def get_chart(
                 series, s, e = get_market_series(key, range, end_date)
             except Exception as ex:
                 raise HTTPException(status_code=500, detail=f"Error for {key}: {ex}")
-            points = [FGISeriesPoint(date=str(idx), value=float(val)) for idx, val in series.items()]
+            points = _series_to_points(series, date_trunc_10=True)
             datasets[key] = points
             if start_date is None:
                 start_date, end_date_actual = s, e
     
     components_list = None
-    if with_components:
+    if with_components and "fgi" in datasets:
         # collect score_* columns
         score_cols = df.drop([col], axis=1).columns.to_list()
         components_list = []
@@ -225,7 +262,7 @@ def get_chart(
             entry = {"date": str(idx)[:10]}
             for sc in score_cols:
                 val = row.get(sc)
-                entry[sc] = None if pd.isna(val) else float(val)
+                entry[sc] = _safe_float(val)
             components_list.append(entry)
     
     duration = (datetime.utcnow() - start_time).total_seconds()
@@ -307,8 +344,8 @@ def get_fgi(
             break
     if not col:
         raise RuntimeError("FG_estimation or FG_like column not found in result.")
-    series = [FGISeriesPoint(date=str(idx)[:10], value=float(val)) for idx, val in df[col].items()]
-    last_value = float(df[col].iloc[-1]) if not df.empty else None
+    series = _series_to_points(df[col], date_trunc_10=True)
+    last_value = _last_finite_value(df[col]) if not df.empty else None
     components_list = None
     if with_components:
         # collect score_* columns
@@ -318,7 +355,7 @@ def get_fgi(
             entry = {"date": str(idx)[:10]}
             for sc in score_cols:
                 val = row.get(sc)
-                entry[sc] = None if pd.isna(val) else float(val)
+                entry[sc] = _safe_float(val)
             components_list.append(entry)
     duration = (datetime.utcnow() - start_time).total_seconds()
     meta = FGIResponseMeta(
@@ -340,7 +377,7 @@ app.mount("/web", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/web/")
+    return RedirectResponse(url="/web/line_chart.html")
 
 if __name__ == "__main__":
     import uvicorn

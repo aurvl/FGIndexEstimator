@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estimated Fear & Greed Index Dashboard</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script>
+        // Apply theme from localStorage, else from system preference (shared across pages)
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (t !== 'dark' && t !== 'light') {
+                    t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                    localStorage.setItem('theme', t);
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { }
+        })();
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            color: #333;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .main-box-content {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            width: 70%;
+            height: 65vh;
+        }
+
+        .title {
+            border-bottom: 1px solid #ccc;
+            padding: 1%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(248, 249, 250, 0.5);
+            border-top-left-radius: 11px;
+            border-top-right-radius: 11px;
+        }
+
+        .navig {
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .navig > div {
+            display: flex;
+            align-items: center;
+            /* border: 1px solid #ccc; */
+            gap: 6px;
+        }
+
+        .navig a {
+            display: flex;
+            text-decoration: none;
+            width: 20px;
+            height: 20px;
+            font-size: 11px;
+            color: #929292cc;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            border-radius: 50%;
+            background-color: #333;
+            transition: background-color 0.3s ease;
+        }
+
+        .navig a:hover {
+            color: #007BFF;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+        }
+
+        .navig a.active {
+            color: #ccc;
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+
+        .toogle-theme {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ccc;
+            background-color: #f8f9fa;
+            border-radius: 7px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .toogle-theme:hover {
+            background-color: #e9ecef;
+        }
+
+        .toogle-theme {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .toogle-theme svg  {
+            width: 20px;
+            height: 20px;
+            stroke: #333;
+        }
+
+        .toogle-theme:hover svg {
+            stroke: #ffc300;
+        }
+        
+        .line-chart-box {
+            margin: 1%;
+            height: 80%;
+            display: block;
+        }
+
+        .line-chart-params {
+            height: 10%;
+            width: 100%;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .time-range {
+            width: 30%;
+            display: flex;
+            gap: 3%;
+        }
+
+        .time-range button {
+            border: none;
+            font-weight: 500;
+            background: none;
+            cursor: pointer;
+            padding: 1%;
+            border-radius: 5px;
+        }
+
+        .time-range button:hover {
+            color: #007BFF;
+            background-color: #f0f0f0;
+        }
+
+        .chart-plot-area {
+            display: flex;
+            height: 74%;
+            width: 98%;
+            margin: 1%;
+            /*border: 1px solid #ccc;*/
+            border-radius: 5px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gauge-chart-plot {
+            height: 100%;
+            width: 60%;
+            padding: 1%;
+            /*border: 1px solid #ccc;*/
+            justify-content: center;
+            align-items: center;
+        }
+
+        .metrics {
+            height: 100%;
+            width:40%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            padding: 1%;
+            gap: 10px;
+        }
+
+        .fields {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .field-sample {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            /*border: 1px solid #ccc;*/
+            margin: 3% 0;
+        }
+        
+        .field-row{
+            width: 88%;
+        }
+
+        .field-row p {
+            display: block;
+            border-bottom: 1px dashed #ccc;
+        }
+        
+        .field-label {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .field-name {
+            font-weight: bold;
+        }
+
+        .field-value {
+            background-color: #ff4d6d;
+            color: white;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        footer {
+            border-top: 1px solid #ccc;
+            height: auto;
+            padding: 1%;
+            font-size: 13px;   
+        }
+
+        footer a {
+            text-decoration: none;
+            color: #333;
+        }
+
+        footer a:hover {
+            color: #007BFF;
+        }
+
+        @media (max-width: 768px) {
+            .main-box-content {
+                width: 100%;
+                height: auto;
+            }
+
+            .chart-plot-area {
+                flex-direction: column;
+                width: 100%;
+                height: auto;
+                margin: 0;
+            }
+
+            .gauge-chart-plot {
+                width: 100%;
+                height: 300px;
+            }
+
+            .metrics {
+                width: 100%;
+                height: auto;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="./newjs/theme.css">
+    <script src="./newjs/theme.js" defer></script>
+    <script src="./newjs/api_store.js" defer></script>
+</head>
+<body>
+    <section class="main-box-content">
+        <div class="title">
+            <h3>Estimated Fear & Greed Index Grade</h3>
+            <div class="navig">
+                <div>
+                    <a href="line_chart.html">◄</a>
+                    <a href="point_chart.html">►</a>
+                </div>
+                <div class="toogle-theme">
+                    <i data-lucide="sun"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-plot-area">
+            <div class="gauge-chart-plot" id="gauge-chart-plot"></div>
+            
+            <div class="metrics">
+                <h4>Quick Summary</h4>
+                <div class="fields">
+                    <div class="field-sample">
+                        <div class="field-row">
+                            <p>Previous close</p>
+                            <span class="field-label" id="qs-prev-label">—</span>
+                        </div>
+                        <span class="field-value" id="qs-prev-value">—</span>
+                    </div>
+                    <div class="field-sample">
+                        <div class="field-row">
+                            <p>One week ago</p>
+                            <span class="field-label" id="qs-1w-label">—</span>
+                        </div>
+                        <span class="field-value" id="qs-1w-value">—</span>
+                    </div>
+                    <div class="field-sample">
+                        <div class="field-row">
+                            <p>One month ago</p>
+                            <span class="field-label" id="qs-1m-label">—</span>
+                        </div>
+                        <span class="field-value" id="qs-1m-value">—</span>
+                    </div>
+                    <div class="field-sample">
+                        <div class="field-row">
+                            <p>Three months ago</p>
+                            <span class="field-label" id="qs-3m-label">—</span>
+                        </div>
+                        <span class="field-value" id="qs-3m-value">—</span>
+                    </div>
+                    <div class="field-sample">
+                        <div class="field-row">
+                            <p>One year ago</p>
+                            <span class="field-label" id="qs-1y-label">—</span>
+                        </div>
+                        <span class="field-value" id="qs-1y-value">—</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; Sources: Yahoo Finance, FRED • 2026 Estimated Fear & Greed Index. All rights reserved.</p>
+            <p>Author: <a href="https://aurvl.github.io/portfolio/index.html">Aurel VEHI</a></p>
+        </footer>
+    </section>
+</body>
+<script>
+    lucide.createIcons();
+</script>
+
+<script>
+    /**
+     * gauge_chart.html
+     *
+     * This page reuses the same cached `/v1/chart?range=MAX` payload stored in
+     * sessionStorage by line_chart.html.
+     *
+     * If the cache is missing (e.g. direct navigation), it will fetch once.
+     */
+
+    window.addEventListener('DOMContentLoaded', function () {
+    (async function () {
+        var chartDom = document.getElementById('gauge-chart-plot');
+        if (!chartDom || typeof echarts === 'undefined' || !window.DashboardStore) return;
+
+        var myChart = echarts.init(chartDom);
+        var option;
+
+    const RATING_COLORS = {
+        "extreme fear": "#d73027",
+        "fear": "#fc8d59",
+        "neutral": "#fee08b",
+        "greed": "#91cf60",
+        "extreme greed": "#1a9850",
+    };
+
+    function getLabelColorForTheme() {
+        var isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+        return isDark ? 'rgba(255,255,255,0.75)' : '#464646';
+    }
+
+    function getRating(score01) {
+        if (score01 < 0.2) return 'extreme fear';
+        if (score01 < 0.4) return 'fear';
+        if (score01 < 0.6) return 'neutral';
+        if (score01 < 0.8) return 'greed';
+        return 'extreme greed';
+    }
+
+    function toTitleCase(label) {
+        return String(label)
+            .split(' ')
+            .map(function (w) { return w ? (w.charAt(0).toUpperCase() + w.slice(1)) : w; })
+            .join(' ');
+    }
+
+    function getRating100(score100) {
+        // score100 is expected in [0..100]
+        if (score100 < 20) return 'extreme fear';
+        if (score100 < 40) return 'fear';
+        if (score100 < 60) return 'neutral';
+        if (score100 < 80) return 'greed';
+        return 'extreme greed';
+    }
+
+    function isoDateMinusDaysFrom(baseIso, days) {
+        // baseIso is YYYY-MM-DD
+        var parts = String(baseIso || '').split('-');
+        if (parts.length < 3) return null;
+        var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - days);
+        var yyyy = d.getFullYear();
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return yyyy + '-' + mm + '-' + dd;
+    }
+
+    function findPointOnOrBefore(points, targetIso) {
+        // points: [{date: YYYY-MM-DD, value: number}] sorted by date ascending
+        if (!Array.isArray(points) || !points.length) return null;
+        if (!targetIso) return null;
+        for (var i = points.length - 1; i >= 0; i--) {
+            var p = points[i];
+            if (!p || !p.date) continue;
+            if (p.date <= targetIso && typeof p.value === 'number' && isFinite(p.value)) return p;
+        }
+        return null;
+    }
+
+    function setQuickSummaryRow(labelId, valueId, point) {
+        var labelEl = document.getElementById(labelId);
+        var valueEl = document.getElementById(valueId);
+        if (!labelEl || !valueEl) return;
+
+        if (!point || typeof point.value !== 'number' || !isFinite(point.value)) {
+            labelEl.textContent = '—';
+            labelEl.style.color = '';
+            valueEl.textContent = '—';
+            valueEl.style.backgroundColor = '';
+            return;
+        }
+
+        var score100 = point.value;
+        var ratingKey = getRating100(score100);
+        var ratingLabel = toTitleCase(ratingKey);
+        var color = RATING_COLORS[ratingKey] || '#999';
+
+        labelEl.textContent = ratingLabel;
+        labelEl.style.color = color;
+        valueEl.textContent = String(Math.round(score100));
+        valueEl.style.backgroundColor = color;
+    }
+
+    // Pull latest FGI from the shared cache
+    var chartPayload = await window.DashboardStore.ensureData({ include: window.DashboardStore.DEFAULT_INCLUDE });
+    var fgiPoints = (chartPayload && chartPayload.datasets && chartPayload.datasets.fgi) ? chartPayload.datasets.fgi : [];
+    var lastFgi = window.DashboardStore.lastFiniteValue(fgiPoints);
+    var lastPoint = (Array.isArray(fgiPoints) && fgiPoints.length) ? fgiPoints[fgiPoints.length - 1] : null;
+    var lastIso = lastPoint && lastPoint.date ? lastPoint.date : null;
+    // API returns 0..100; gauge expects 0..1
+    var gaugeValue = (typeof lastFgi === 'number' && isFinite(lastFgi)) ? Math.max(0, Math.min(1, lastFgi / 100)) : 0;
+
+    function buildGaugeOption(gaugeValue01) {
+        var labelColor = getLabelColorForTheme();
+        var rating = getRating(gaugeValue01);
+        var ratingLabel = toTitleCase(rating);
+        var ratingColor = RATING_COLORS[rating] || labelColor;
+
+        return {
+            series: [
+                {
+                    type: 'gauge',
+                    startAngle: 180,
+                    endAngle: 0,
+                    center: ['50%', '75%'],
+                    radius: '90%',
+                    min: 0,
+                    max: 1,
+                    splitNumber: 10,
+                    axisLine: {
+                        lineStyle: {
+                            width: 6,
+                            color: [
+                                [0.2, RATING_COLORS["extreme fear"]],
+                                [0.4, RATING_COLORS["fear"]],
+                                [0.6, RATING_COLORS["neutral"]],
+                                [0.8, RATING_COLORS["greed"]],
+                                [1.0, RATING_COLORS["extreme greed"]]
+                            ]
+                        }
+                    },
+                    pointer: {
+                        icon: 'path://M12.8,0.7l12,40.1H0.7L12.8,0.7z',
+                        length: '12%',
+                        width: 20,
+                        offsetCenter: [0, '-60%'],
+                        itemStyle: {
+                            color: 'auto'
+                        }
+                    },
+                    axisTick: {
+                        length: 12,
+                        lineStyle: {
+                            color: 'auto',
+                            width: 2
+                        }
+                    },
+                    splitLine: {
+                        length: 20,
+                        lineStyle: {
+                            color: 'auto',
+                            width: 5
+                        }
+                    },
+                    axisLabel: {
+                        color: labelColor,
+                        fontSize: 16,
+                        distance: -60,
+                        rotate: 'tangential',
+                        formatter: function (value) {
+                            // Labels at midpoints (robust to floating point)
+                            var v = Math.round(value * 10) / 10;
+                            if (v === 0.1) return 'Extreme fear';
+                            if (v === 0.3) return 'Fear';
+                            if (v === 0.5) return 'Neutral';
+                            if (v === 0.7) return 'Greed';
+                            if (v === 0.9) return 'Extreme greed';
+                            return '';
+                        }
+                    },
+                    title: {
+                        offsetCenter: [0, '-10%'],
+                        fontSize: 20,
+                        color: ratingColor
+                    },
+                    detail: {
+                        fontSize: 30,
+                        offsetCenter: [0, '-35%'],
+                        valueAnimation: true,
+                        formatter: function (value) {
+                            return Math.round(value * 100) + '';
+                        },
+                        color: ratingColor
+                    },
+                    data: [
+                        {
+                            value: gaugeValue01,
+                            name: ratingLabel
+                        }
+                    ]
+                }
+            ]
+        };
+    }
+
+    // --- Quick Summary rows ---
+    // We use the last available date in the series as reference.
+    // For each period we target (lastDate - N days) and pick the closest point
+    // on-or-before that date (trading calendars have gaps).
+    if (lastIso) {
+        setQuickSummaryRow('qs-prev-label', 'qs-prev-value', findPointOnOrBefore(fgiPoints, isoDateMinusDaysFrom(lastIso, 1)));
+        setQuickSummaryRow('qs-1w-label', 'qs-1w-value', findPointOnOrBefore(fgiPoints, isoDateMinusDaysFrom(lastIso, 7)));
+        setQuickSummaryRow('qs-1m-label', 'qs-1m-value', findPointOnOrBefore(fgiPoints, isoDateMinusDaysFrom(lastIso, 30)));
+        setQuickSummaryRow('qs-3m-label', 'qs-3m-value', findPointOnOrBefore(fgiPoints, isoDateMinusDaysFrom(lastIso, 90)));
+        setQuickSummaryRow('qs-1y-label', 'qs-1y-value', findPointOnOrBefore(fgiPoints, isoDateMinusDaysFrom(lastIso, 365)));
+    }
+
+    option = buildGaugeOption(gaugeValue);
+    option && myChart.setOption(option, true);
+
+    // Theme toggle: update chart label colors immediately
+    window.addEventListener('dashboard:themechange', function () {
+        var nextOption = buildGaugeOption(gaugeValue);
+        myChart.setOption(nextOption, true);
+    });
+
+    window.addEventListener('resize', function () {
+        myChart.resize();
+    });
+    })();
+    });
+</script>
+</html>

@@ -49,7 +49,23 @@ FGIndexEstimator/
 
   * Historical series of the **CNN Fear & Greed** index (0–100 score) downloaded from CNN Business, used as a **benchmark** for calibration.
 
-All series are aligned on a **US business-day calendar**. Holidays and missing values are handled via **forward-fill** on prices/liquidity, which makes it possible to compute moving averages and returns without breaks.
+   * **How to retrieve the original CNN history (HTML → CSV/PNG)**
+
+      - Open the CNN page: https://edition.cnn.com/markets/fear-and-greed
+      - Click the **Timeline** tab (important: this loads the historical chart data).
+      - Save the page (`Ctrl+S`) as **Webpage, HTML Only** (or **Complete**).
+      - Run the parser/plotter:
+
+         ```bash
+         python -m data.get_cnn_data.fear_greed_data
+         ```
+
+         - When asked for the output directory, you can type `data`.
+         - When asked for the HTML path, paste the full path to the saved `.html` file (or press Enter to use the default example file in `data/get_cnn_data/`).
+
+      This script extracts `lines[0].data.series` from the HTML (`div.market-line-chart[data-instance]`) and outputs a CSV + a static PNG (and shows an animated replay).
+
+The series are aligned on a **US business-day calendar**. Holidays and missing values are handled via **forward-fill** on prices/liquidity, which makes it possible to compute moving averages and returns without breaks.
 
 ---
 
@@ -124,7 +140,7 @@ The `compute_fear_greed` function aggregates component scores into a global inde
 ## Results
 
 <img src="./img/results1.png" alt="Illustration" width="100%">
-<img src="./img/results2.png" alt="Illustration" width="100%">
+<img src="./img/results1_scatter.png" alt="Illustration" width="100%">
 
 ### 1. Naive replication (simple average)
 
@@ -159,7 +175,7 @@ The calibrated index now follows **much more closely the phases of euphoria and 
 
 ### 3. Regime interpretation (classification)
 
-<img src="./img/results3.png" alt="Illustration" width="100%">
+<img src="./img/final_calibrated_fg.png" alt="Illustration" width="100%">
 
 To better interpret the scores, the index is projected onto five categories:
 

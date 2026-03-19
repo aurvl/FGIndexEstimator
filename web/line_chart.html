@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estimated Fear & Greed Index Dashboard</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script>
+        // Apply theme from localStorage, else from system preference (shared across pages)
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (t !== 'dark' && t !== 'light') {
+                    t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                    localStorage.setItem('theme', t);
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { }
+        })();
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            color: #333;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .main-box-content {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            width: 70%;
+            height: 65vh;
+        }
+
+        .title {
+            border-bottom: 1px solid #ccc;
+            padding: 1%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(248, 249, 250, 0.5);
+            border-top-left-radius: 11px;
+            border-top-right-radius: 11px;
+        }
+
+        .navig {
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .navig > div {
+            display: flex;
+            align-items: center;
+            /* border: 1px solid #ccc; */
+            gap: 6px;
+        }
+
+        .navig a {
+            display: flex;
+            text-decoration: none;
+            width: 20px;
+            height: 20px;
+            font-size: 11px;
+            color: #929292cc;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            border-radius: 50%;
+            background-color: #333;
+            transition: background-color 0.3s ease;
+        }
+
+        .navig a:hover {
+            color: #007BFF;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+        }
+
+        .navig a.active {
+            color: #ccc;
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+
+        .toogle-theme {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ccc;
+            background-color: #f8f9fa;
+            border-radius: 7px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .toogle-theme:hover {
+            background-color: #e9ecef;
+        }
+
+        .toogle-theme {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .toogle-theme svg  {
+            width: 20px;
+            height: 20px;
+            stroke: #333;
+        }
+
+        .toogle-theme:hover svg {
+            stroke: #ffc300;
+        }
+        
+        .line-chart-box {
+            margin: 0 1%;
+            height: 78%;
+            display: block;
+        }
+
+        .line-chart-params {
+            height: 10%;
+            width: 100%;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .time-range {
+            width: 30%;
+            display: flex;
+            gap: 3%;
+        }
+
+        .time-range button {
+            border: none;
+            font-weight: 500;
+            background: none;
+            cursor: pointer;
+            padding: 1%;
+            border-radius: 5px;
+        }
+
+        .time-range button:hover {
+            color: #007BFF;
+            background-color: #f0f0f0;
+        }
+
+        #market-indexes-selector {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            background-color: #f0f0f0;
+            cursor: pointer;
+        }
+
+        #market-indexes-selector:hover {
+            background-color: #e0e0e0;
+        }
+
+        .line-chart-plot {
+            height: 88%;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        footer {
+            border-top: 1px solid #ccc;
+            padding: 1%;
+            font-size: 13px;   
+        }
+
+        footer a {
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: #007BFF;
+        }
+
+        @media (max-width: 768px) {
+            .main-box-content {
+                width: 100%;
+                height: auto;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="./newjs/theme.css">
+    <script src="./newjs/theme.js" defer></script>
+    <script src="./newjs/api_store.js" defer></script>
+</head>
+<body>
+    <section class="main-box-content">
+        <div class="title">
+            <h3>Estimated Fear & Greed Index Evolution</h3>
+            <div class="navig">
+                <div>
+                    <a href="#" class="active">◄</a>
+                    <a href="gauge_chart.html">►</a>
+                </div>
+                <div class="toogle-theme">
+                    <i data-lucide="sun"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="line-chart-box">
+            <div class="line-chart-params">
+                <div class="time-range">
+                    <p>Range:</p>
+                    <button class="seg seg--active" data-range="1M">1M</button>
+                    <button class="seg" data-range="3M">3M</button>
+                    <button class="seg" data-range="6M">6M</button>
+                    <button class="seg" data-range="1Y">1Y</button>
+                    <button class="seg" data-range="5Y">5Y</button>
+                    <button class="seg" data-range="MAX">MAX</button>
+                </div>
+                <select id="market-indexes-selector">
+                    <option value="index1">None</option>
+                    <option value="index1">Index 1</option>
+                    <option value="index2">Index 2</option>
+                    <option value="index3">Index 3</option>
+                </select>
+            </div>
+
+            <div class="line-chart-plot" id="line-chart-plot"></div>
+        </div>
+
+        <footer>
+            <p>&copy; Sources: Yahoo Finance, FRED • 2026 Estimated Fear & Greed Index. All rights reserved.</p>
+            <p>Author: <a href="https://aurvl.github.io/portfolio/index.html">Aurel VEHI</a></p>
+        </footer>
+    </section>
+</body>
+<script>
+    lucide.createIcons();
+</script>
+
+<script>
+    /**
+     * line_chart.html
+     *
+     * This page is the "entry" page.
+     * It triggers the single API fetch (MAX) and stores it in sessionStorage.
+     * All other pages reuse the same cached payload.
+     */
+
+    window.addEventListener('DOMContentLoaded', function () {
+    (async function () {
+        var chartDom = document.getElementById('line-chart-plot');
+        if (!chartDom || typeof echarts === 'undefined' || !window.DashboardStore) return;
+
+        var myChart = echarts.init(chartDom);
+
+        // Map ids to labels (kept in sync with deploy/services/market_service.py)
+        var MARKET_LABELS = {
+            sp500: 'S&P 500',
+            nasdaq: 'NASDAQ Composite',
+            cac40: 'CAC 40',
+            msciworld: 'MSCI World'
+        };
+
+        // --- UI elements ---
+        var rangeButtons = Array.prototype.slice.call(document.querySelectorAll('.time-range button[data-range]'));
+        var marketSelect = document.getElementById('market-indexes-selector');
+
+        function setActiveRange(range) {
+            rangeButtons.forEach(function (btn) {
+                var isActive = btn.getAttribute('data-range') === range;
+                btn.classList.toggle('seg--active', isActive);
+            });
+        }
+
+        function populateMarketSelect() {
+            if (!marketSelect) return;
+            // Replace placeholder options with real ones.
+            marketSelect.innerHTML = '';
+            var optNone = document.createElement('option');
+            optNone.value = 'none';
+            optNone.textContent = 'None';
+            marketSelect.appendChild(optNone);
+
+            Object.keys(MARKET_LABELS).forEach(function (id) {
+                var opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = MARKET_LABELS[id];
+                marketSelect.appendChild(opt);
+            });
+        }
+
+        function getThemeColors() {
+            var isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+            return {
+                isDark: isDark,
+                text: isDark ? 'rgba(255,255,255,0.75)' : '#464646',
+                gridLine: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'
+            };
+        }
+
+        function toTimeSeries(points) {
+            // ECharts `time` axis accepts [dateString, value]
+            if (!Array.isArray(points)) return [];
+            return points
+                .filter(function (p) { return p && p.date && typeof p.value === 'number' && isFinite(p.value); })
+                .map(function (p) {
+                    // For FGI we clamp display to 0..100
+                    return [p.date, p.value];
+                });
+        }
+
+        function clamp01_100(v) {
+            if (typeof v !== 'number' || !isFinite(v)) return null;
+            return Math.max(0, Math.min(100, v));
+        }
+
+        function render(chartPayload, state) {
+            var colors = getThemeColors();
+            var datasets = (chartPayload && chartPayload.datasets) ? chartPayload.datasets : {};
+
+            // Color choices (requested): FGI in red, market index in green
+            var FGI_COLOR = '#d73027';
+            var MARKET_COLOR = '#1a9850';
+
+            var fgiPointsAll = datasets.fgi || [];
+            var fgiPoints = window.DashboardStore.slicePointsByRange(fgiPointsAll, state.range);
+            var fgiSeries = toTimeSeries(fgiPoints)
+                .map(function (row) { return [row[0], clamp01_100(row[1])]; })
+                .filter(function (row) { return row[1] != null; });
+
+            var marketSeries = [];
+            var showMarket = state.marketId && state.marketId !== 'none' && datasets[state.marketId];
+            if (showMarket) {
+                var mPointsAll = datasets[state.marketId] || [];
+                var mPoints = window.DashboardStore.slicePointsByRange(mPointsAll, state.range);
+                marketSeries = toTimeSeries(mPoints);
+            }
+
+            var option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross'
+                    }
+                },
+                grid: {
+                    left: 40,
+                    right: showMarket ? 60 : 20,
+                    top: 20,
+                    bottom: 30
+                },
+                xAxis: {
+                    type: 'time',
+                    axisLabel: { color: colors.text },
+                    splitLine: { show: false }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        min: 0,
+                        max: 100,
+                        axisLabel: { color: colors.text },
+                        splitLine: { lineStyle: { color: colors.gridLine } }
+                    },
+                    {
+                        type: 'value',
+                        axisLabel: { color: colors.text },
+                        splitLine: { show: false },
+                        show: !!showMarket
+                    }
+                ],
+                series: [
+                    {
+                        name: 'FGI',
+                        type: 'line',
+                        showSymbol: false,
+                        data: fgiSeries,
+                        lineStyle: { color: FGI_COLOR },
+                        itemStyle: { color: FGI_COLOR }
+                    }
+                ]
+            };
+
+            if (showMarket) {
+                option.series.push({
+                    name: MARKET_LABELS[state.marketId] || state.marketId,
+                    type: 'line',
+                    yAxisIndex: 1,
+                    showSymbol: false,
+                    data: marketSeries,
+                    lineStyle: { color: MARKET_COLOR, type: 'solid' },
+                    itemStyle: { color: MARKET_COLOR }
+                });
+            }
+
+            myChart.setOption(option, true);
+        }
+
+        // 1) Ensure cached data exists (fetch ONCE here)
+        var chartPayload = await window.DashboardStore.ensureData({ include: window.DashboardStore.DEFAULT_INCLUDE });
+
+        // 2) Setup UI from saved state (shared across pages)
+        populateMarketSelect();
+        var state = window.DashboardStore.getState();
+        setActiveRange(state.range);
+        if (marketSelect) marketSelect.value = state.marketId;
+
+        // 3) Initial render
+        render(chartPayload, state);
+
+        // 3b) Theme toggle: re-render with new label/grid colors
+        window.addEventListener('dashboard:themechange', function () {
+            render(chartPayload, state);
+        });
+
+        // 4) Interactions (update state + re-render, no refetch)
+        rangeButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var nextRange = btn.getAttribute('data-range');
+                state = window.DashboardStore.setState({ range: nextRange });
+                setActiveRange(state.range);
+                render(chartPayload, state);
+            });
+        });
+
+        if (marketSelect) {
+            marketSelect.addEventListener('change', function () {
+                var nextMarket = marketSelect.value;
+                state = window.DashboardStore.setState({ marketId: nextMarket });
+                render(chartPayload, state);
+            });
+        }
+
+        window.addEventListener('resize', function () {
+            myChart.resize();
+        });
+    })();
+    });
+</script>
+</html>
