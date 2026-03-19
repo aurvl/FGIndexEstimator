@@ -26,8 +26,8 @@ warnings.filterwarnings(
 )
 
 # Constants
-# 
-CALIB_MODEL_PATH = Path("models") / "fg_linear_weights.pkl"
+MODEL_NAME = "fg_linear_weights_2026-03-19.pkl"
+CALIB_MODEL_PATH = Path("models") / MODEL_NAME
 load_dotenv()
 API_KEY = os.getenv("API_KEY", "")
 
