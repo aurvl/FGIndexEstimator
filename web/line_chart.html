@@ -201,6 +201,51 @@
                 height: auto;
             }
         }
+        /* Adjust layout for medium/small tablets and large phones */
+        @media (min-width: 451px) and (max-width: 768px) {
+            body {
+                align-items: center; /* keep vertical centering on phablets */
+                padding-top: 8px;
+            }
+            .main-box-content {
+                width: 94%;
+                height: 75vh; /* slightly taller to keep charts readable */
+                margin: 0 3%;
+            }
+            .line-chart-plot {
+                /* make the plot taller inside the box for these viewports */
+                height: 420px !important;
+            }
+        }
+        /* Mobile-specific adjustments (small phones) */
+        @media (max-width: 480px) {
+            body {
+                align-items: flex-start !important;
+                padding-top: 18px;
+            }
+            .main-box-content {
+                width: calc(100% - 24px);
+                margin: 0 12px;
+                height: auto;
+                max-height: calc(100vh - 36px);
+                overflow: auto;
+            }
+            /* Give the chart a fixed pixel height so it remains visible on small viewports */
+            .line-chart-plot {
+                height: 320px !important;
+            }
+        }
+
+        /* For very small phones (<=450px) we center the main content vertically */
+        @media (max-width: 450px) {
+            body {
+                align-items: center !important;
+                padding-top: 12px;
+            }
+            .main-box-content {
+                margin: 12px auto;
+            }
+        }
     </style>
     <link rel="stylesheet" href="./newjs/theme.css">
     <script src="./newjs/theme.js" defer></script>

@@ -268,11 +268,81 @@
             .gauge-chart-plot {
                 width: 100%;
                 height: 300px;
+                padding: 12px; /* avoid touching edges */
+                box-sizing: border-box;
             }
 
             .metrics {
                 width: 100%;
                 height: auto;
+            }
+        }
+        /* Adjust layout for medium/small tablets and large phones */
+        @media (min-width: 451px) and (max-width: 768px) {
+            body {
+                align-items: center;
+                padding-top: 8px;
+            }
+            .main-box-content {
+                width: 94%;
+                height: 75vh;
+                margin: 0 3%;
+                padding: 8px;
+                box-sizing: border-box;
+            }
+            .gauge-chart-plot {
+                height: 420px !important;
+                padding: 12px;
+                box-sizing: border-box;
+            }
+            .chart-plot-area {
+                height: auto;
+            }
+        }
+        /* Mobile-specific adjustments (small phones) */
+        @media (max-width: 480px) {
+            body {
+                align-items: flex-start !important;
+                padding-top: 18px;
+            }
+            .main-box-content {
+                width: calc(100% - 24px);
+                margin: 0 12px;
+                height: auto;
+                max-height: calc(100vh - 36px);
+                overflow: auto;
+            }
+            .gauge-chart-plot {
+                height: 320px !important;
+                padding: 12px; /* avoid touching edges */
+                box-sizing: border-box;
+            }
+            .chart-plot-area {
+                height: auto;
+            }
+        }
+        /* Narrow breakpoint: avoid metrics/footer overflow around 470-485px */
+        @media (min-width: 470px) and (max-width: 485px) {
+            .chart-plot-area {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .gauge-chart-plot {
+                width: 100%;
+                height: 320px !important;
+                order: 1;
+            }
+            .metrics {
+                width: 100%;
+                order: 2;
+            }
+            .main-box-content {
+                padding-bottom: 40px;
+                box-sizing: border-box;
+            }
+            footer {
+                position: relative;
             }
         }
     </style>
