@@ -26,7 +26,9 @@ warnings.filterwarnings(
 )
 
 # Constants
-MODEL_NAME = "fg_linear_weights_2026-03-19.pkl"
+models_dir = Path("models")
+model_files = sorted(models_dir.glob("*.pkl"), key=os.path.getmtime)
+MODEL_NAME = model_files[-1].name
 CALIB_MODEL_PATH = Path("models") / MODEL_NAME
 load_dotenv()
 API_KEY = os.getenv("API_KEY", "")
