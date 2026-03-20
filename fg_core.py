@@ -1,4 +1,5 @@
 import os
+import re
 import pickle
 import pandas as pd
 from dotenv import load_dotenv
@@ -19,9 +20,34 @@ warnings.filterwarnings(
 )
 
 # Constants
-today = pd.Timestamp.today().normalize()
-MODEL_NAME = "fg_weights_" + today.strftime("%Y-%m-%d") + ".pkl"
-CALIB_MODEL_PATH = Path("models") / MODEL_NAME
+MODELS_DIR = Path("models")
+WEIGHTS_RE = re.compile(r"^fg_weights_(\d{4}-\d{2}-\d{2})\.pkl$")
+
+def get_latest_calib_model_path(models_dir: Path = MODELS_DIR) -> Path:
+    if not models_dir.exists():
+        raise FileNotFoundError(f"Models directory not found: {models_dir}")
+
+    best_dt = None
+    best_path = None
+    for p in models_dir.iterdir():
+        if not p.is_file():
+            continue
+        m = WEIGHTS_RE.match(p.name)
+        if not m:
+            continue
+        dt = pd.to_datetime(m.group(1), errors="coerce")
+        if pd.isna(dt):
+            continue
+        dt = dt.normalize()
+        if best_dt is None or dt > best_dt:
+            best_dt = dt
+            best_path = p
+
+    if best_path is None:
+        raise FileNotFoundError(
+            f"No calibrated model found in {models_dir} (expected fg_weights_YYYY-MM-DD.pkl)"
+        )
+    return best_path
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY", "")
@@ -68,9 +94,15 @@ def get_fgi_estimation(
     else:
         start_ts = pd.to_datetime(start_date)
     if use_calibrated_model:
-        weights, intercept = load_model(CALIB_MODEL_PATH)
+        try:
+            latest_path = get_latest_calib_model_path()
+            weights, intercept = load_model(latest_path)
+        except FileNotFoundError:
+            # fallback: moyenne simple si aucun modèle dispo
+            weights, intercept = None, 0.0
     else:
         weights, intercept = None, 0.0
+    
     df_raw = build_raw_indicators(
         api_key_fred=API_KEY,
         data_dir=data_dir,
