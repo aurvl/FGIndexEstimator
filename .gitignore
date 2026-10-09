@@ -3,3 +3,5 @@ __pycache__/
 .ipynb_checkpoints/
 *_cache*/
 test*
+# Local AI project memory
+.ai-memory/
